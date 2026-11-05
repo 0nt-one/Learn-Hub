@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.verification/
+.env
+.env.*
+!.env.example
+*.local
+*.tsbuildinfo
+auto-imports.d.ts
+components.d.ts
+npm-debug.log*
+
