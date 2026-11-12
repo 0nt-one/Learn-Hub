@@ -4,6 +4,20 @@
 
 设计文档、前后端工程、九张数据库表，以及注册登录、三角色权限、资源投稿与审核、收藏、学习记录、通知和管理员操作日志均已实现。首页会调用后端健康检查。
 
+## 页面截图
+
+下图展示本地演示数据下的实际页面。资源链接使用演示地址，截图中的用户与课程均为模拟数据。
+
+![Learn-Hub 首页](docs/screenshots/home.png)
+
+| 资源中心 | 资源投稿 |
+| --- | --- |
+| ![按课程、分类和类型浏览资源](docs/screenshots/resource-center.png) | ![创建资源草稿](docs/screenshots/resource-submission.png) |
+
+| 资源审核 | 管理员概览 |
+| --- | --- |
+| ![审核资源投稿](docs/screenshots/resource-review.png) | ![管理员查看待审数量和操作日志](docs/screenshots/admin-overview.png) |
+
 ## 项目结构
 
 ```text
