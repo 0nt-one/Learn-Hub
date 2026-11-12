@@ -1,70 +1,30 @@
-from datetime import datetime, timedelta, timezone
+"""Check whether the configured SQLite database is ready for requests."""
 
-import jwt
-import pytest
+from pathlib import Path
+
+from sqlalchemy import inspect, text
+from sqlalchemy.engine import make_url
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.config import Settings
-from app.core.tokens import (
-    InvalidAccessTokenError,
-    create_access_token,
-    decode_access_token,
-)
+from app.db.engine import create_db_engine
+from app.db.model_registry import EXPECTED_TABLES
 
 
-TEST_SECRET = "test-only-secret-key-for-tokens-1234"
+def database_is_ready(settings: Settings) -> bool:
+    database_path = make_url(settings.database_url).database
+    if database_path != ":memory:" and (
+        database_path is None or not Path(database_path).is_file()
+    ):
+        return False
 
-
-def test_created_token_returns_user_id() -> None:
-    settings = Settings(
-        _env_file=None,
-        database_url="sqlite:///:memory:",
-        jwt_secret_key=TEST_SECRET,
-    )
-
-    access_token, expires_in = create_access_token(42, settings)
-
-    assert expires_in == 1800
-    assert decode_access_token(access_token, settings) == 42
-
-
-def test_token_signed_with_another_key_is_rejected() -> None:
-    settings = Settings(
-        _env_file=None,
-        database_url="sqlite:///:memory:",
-        jwt_secret_key=TEST_SECRET,
-    )
-    access_token, _ = create_access_token(42, settings)
-
-    other_settings = Settings(
-        _env_file=None,
-        database_url="sqlite:///:memory:",
-        jwt_secret_key="another-test-secret-key-for-tokens-1234",
-    )
-
-    with pytest.raises(InvalidAccessTokenError):
-        decode_access_token(access_token, other_settings)
-
-
-def test_expired_token_is_rejected() -> None:
-    settings = Settings(
-        _env_file=None,
-        database_url="sqlite:///:memory:",
-        jwt_secret_key=TEST_SECRET,
-    )
-    issued_at = datetime.now(timezone.utc) - timedelta(hours=1)
-    expired_at = issued_at + timedelta(minutes=30)
-
-    expired_token = jwt.encode(
-        {
-            "sub": "42",
-            "iat": issued_at,
-            "exp": expired_at,
-            "iss": "learn-hub",
-            "aud": "learn-hub-api",
-        },
-        TEST_SECRET,
-        algorithm="HS256",
-    )
-
-    with pytest.raises(InvalidAccessTokenError):
-        decode_access_token(expired_token, settings)
+    engine = create_db_engine(settings)
+    try:
+        with engine.connect() as connection:
+            connection.execute(text("SELECT 1"))
+            existing_tables = set(inspect(connection).get_table_names())
+        return EXPECTED_TABLES.issubset(existing_tables)
+    except SQLAlchemyError:
+        return False
+    finally:
+        engine.dispose()

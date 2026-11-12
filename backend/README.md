@@ -1,6 +1,6 @@
 # Learn-Hub 后端
 
-FastAPI + Pydantic 2 + SQLAlchemy 2.0.x 的独立 Python 工程，要求 Python 3.12 或以上版本。现有九张表模型、数据库初始化和公开的 `/health`；身份权限与业务接口在后续阶段实现。
+FastAPI + Pydantic 2 + SQLAlchemy 2.0.x 的独立 Python 工程，要求 Python 3.12 或以上版本。包含九张表模型、数据库初始化、`/health`、身份权限及业务接口。
 
 ## 目录与职责
 
@@ -23,7 +23,7 @@ backend/
     test_config.py           # 配置拒绝与路径解析
 ```
 
-九个模型位于 `app/models/`。`/api/v1` 的业务路由仍为空；`/health` 用于最小联调。
+九个模型位于 `app/models/`。`/api/v1` 已装配认证、用户、课程、分类、资源、审核、收藏、学习记录、通知与操作日志接口。
 
 ## 环境与安装
 
@@ -44,15 +44,22 @@ python -m venv .venv
 | APP_ENV | development | development / testing / production |
 | DATABASE_URL | sqlite:///data/learn_hub.db | 文件路径相对 backend 解析为绝对路径；也支持 sqlite:///:memory: |
 | CORS_ORIGINS | [] | JSON 数组；只接受精确 HTTP(S) origin，不允许通配符、凭据、查询或业务路径 |
+| JWT_SECRET_KEY | 无 | 至少 32 字节的随机密钥；启动 API 时必填，保存在本地 `.env`，不要提交 |
 
-配置校验不创建目录、连接或数据库文件。默认不启用跨域，前端通过 Vite 的 `/api` 和 `/health` 同源代理访问；需要直接跨域访问时显式填写允许的 origin。`APP_ENV` 当前只标识环境，不会自动配置生产部署或身份认证。
+配置校验不创建目录、连接或数据库文件。默认不启用跨域，前端通过 Vite 的 `/api` 和 `/health` 同源代理访问；需要直接跨域访问时显式填写允许的 origin。`APP_ENV` 只标识环境，不会自动配置生产部署。
 
 ## 启动方式
 
-首次启动先初始化默认 SQLite 数据库（自动创建 `backend/data/` 和九张表）：
+首次启动先将 `.env.example` 复制为 `.env` 并设置至少 32 字节的 `JWT_SECRET_KEY`，再初始化默认 SQLite 数据库（自动创建 `backend/data/` 和九张表）：
 
 ```powershell
 .\.venv\Scripts\python.exe -m app.db.init_db
+```
+
+首次创建管理员时，在 backend 目录的交互终端运行下列命令。密码会隐藏输入；已有管理员时命令拒绝再次创建。不要把密码写在命令行参数中。
+
+```powershell
+.\.venv\Scripts\python.exe -m app.cli.bootstrap_admin
 ```
 
 再启动 API：
@@ -65,7 +72,7 @@ FastAPI 文档入口：<http://127.0.0.1:8000/docs>；健康检查：<http://127
 
 从项目根目录启动时增加 `--app-dir backend` 并使用 `backend/.venv/Scripts/python.exe`。生产部署不使用 `--reload`，部署方案另行制定。
 
-## 验证边界
+## 工程初始化时的历史验证记录
 
 2026-10-24，任务二第 4 步已完成：
 
@@ -94,7 +101,7 @@ FastAPI 文档入口：<http://127.0.0.1:8000/docs>；健康检查：<http://127
 | 从项目根目录运行 Uvicorn factory + reload | `127.0.0.1:8000` 启动成功，日志显示 `Application startup complete` |
 | HTTPX 请求 `/docs`、`/redoc` | 均返回 200，Content-Type 为 text/html；未据此宣称浏览器中的外部脚本已验证 |
 | HTTPX 请求 `/openapi.json` | 返回 200，标题 Learn-Hub API，业务 paths 数量为 0 |
-| HTTPX 请求 `/api/v1/health` | 返回预期的 404；健康检查尚未实现 |
+| HTTPX 请求 `/api/v1/health` | 当时返回预期的 404；正式健康检查位于 `/health` |
 | pytest + HTTPX 自动化检查 | 本机 Python 3.12.4 / pytest 9.1.1 环境，`16 passed in 0.75s`，退出码 0 |
 | 数据库副作用检查 | 没有创建默认 data 目录或数据库文件 |
 
@@ -108,6 +115,8 @@ FastAPI 文档入口：<http://127.0.0.1:8000/docs>；健康检查：<http://127
 .\.venv\Scripts\python.exe -m pytest -q
 ```
 
+2026-11-11：现有 35 项测试通过，覆盖身份权限、资源、审核、收藏、学习记录、通知及操作日志等接口。以下任务四数字是工程初始化时的历史结果。
+
 检查覆盖：OpenAPI 可访问且不创建数据库、默认不开启跨域、允许 origin 的预检成功、不同端口和未授权 origin 被拒绝、数据库路径不依赖当前工作目录、无效数据库 URL 及不合法 CORS 配置被拒绝。
 
-任务四验证：`python -m pytest -q` 返回 `17 passed in 0.77s`，新增测试覆盖初始化前 503 与初始化后 200；临时数据库的九表建表和外键开关已验证。真实 HTTP 请求至后端 `/health` 和 Vite 开发代理 `/health` 均返回 200；测试服务已停止，临时数据库已删除。身份鉴权和业务接口仍未实现。
+任务四在 2026-10-24 的验证结果为 `17 passed in 0.77s`，覆盖当时的健康检查与数据库初始化。该数字是历史记录，当前业务接口的检查应重新运行上述 pytest 命令。
