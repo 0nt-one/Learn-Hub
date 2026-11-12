@@ -6,6 +6,5 @@ export async function checkBackendHealth(): Promise<boolean> {
     cache: 'no-store',
     signal: AbortSignal.timeout(5000),
   })
-
   return response.ok
 }

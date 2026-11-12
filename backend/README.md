@@ -70,6 +70,22 @@ python -m venv .venv
 
 FastAPI 文档入口：<http://127.0.0.1:8000/docs>；健康检查：<http://127.0.0.1:8000/health>。健康检查执行查询并确认九张表存在；数据库未初始化或不可连接时返回 503。
 
+## 独立演示数据
+
+想直接浏览填充后的系统，首次可在 `backend/` 目录运行（如果演示数据库已生成，跳过第一行）：
+
+```powershell
+.\.venv\Scripts\python.exe -m app.cli.seed_demo
+$env:DATABASE_URL = "sqlite:///data/learn_hub_demo.db"
+.\.venv\Scripts\python.exe -m uvicorn app.main:create_app --factory --host 127.0.0.1 --port 8010 --reload
+```
+
+命令创建单独的 `backend/data/learn_hub_demo.db`，不会修改默认的 `learn_hub.db`。内含 6 位用户、5 门课程、5 个分类、14 条资源，覆盖已通过、待审核、草稿、被拒绝四种状态，以及审核通知、操作日志、收藏和学习进度。数据库文件已被 Git 忽略。再次运行会拒绝覆盖已有文件；若要重新生成，请先自行备份或移走旧的演示数据库。
+
+所有演示账号密码都是 `LearnHubDemo2026!`：管理员 `demo_admin`；教师 `demo_chen`、`demo_wang`；学生 `demo_zhou`、`demo_li`、`demo_sun`。这些账号只适合本地演示，不要将演示数据库用于公开部署。资源的 `example.org` 地址是占位链接，不包含真实文件或视频。
+
+前端 Vite 代理需要指向同一后端端口。在 `frontend/` 目录启动前，当前 PowerShell 窗口先执行 `$env:VITE_API_PROXY_TARGET = "http://127.0.0.1:8010"`，然后运行 `npm run dev`。切回原数据库时，关闭演示后端，在新 PowerShell 窗口不设置 `DATABASE_URL` 即可按上面的常规启动命令运行；如同一窗口继续使用，先执行 `Remove-Item Env:DATABASE_URL`。
+
 从项目根目录启动时增加 `--app-dir backend` 并使用 `backend/.venv/Scripts/python.exe`。生产部署不使用 `--reload`，部署方案另行制定。
 
 ## 工程初始化时的历史验证记录

@@ -1,28 +1,109 @@
 @import "tailwindcss";
 @import "@nuxt/ui";
 
+/*
+ * 主题层：所有设计令牌集中在这里，页面与组件只引用语义变量。
+ * 上半部分是 Learn-Hub 自有令牌（docs/ui-design-spec.md 第 3 节），
+ * 下半部分把它们映射到 Nuxt UI 的语义令牌，让库组件与自绘组件观感一致。
+ */
 @theme {
   --font-sans: Inter, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+
+  /* 圆角比例尺按规范 3.3 重定：按钮/输入 8、卡片 12、Bento 20、Hero 24。
+     Nuxt UI 组件用 --radius-* 取值，因此在这里统一覆盖，不在页面里另写。 */
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-3xl: 32px;
 }
 
 :root {
   color-scheme: light;
-  --lh-primary: #004cff;
-  --lh-primary-hover: #003dd1;
-  --lh-primary-pressed: #0033ad;
+
+  /* ---- 品牌与中性色 ---- */
+  --lh-primary: #155eef;
+  --lh-primary-hover: #124ecc;
+  --lh-primary-pressed: #1042a8;
   --lh-primary-soft: #eaf0ff;
   --lh-primary-border: #b7c9ff;
   --lh-page: #f5f8ff;
-  --lh-surface: #fff;
+  --lh-surface: #ffffff;
   --lh-surface-subtle: #f1f5fb;
   --lh-text: #0b1535;
   --lh-text-secondary: #52627a;
+  --lh-text-dimmed: #6b7a91;
   --lh-border: #e2e8f2;
   --lh-control-border: #7d8aa0;
+  --lh-control-track: #c6d6ef;
+
+  /* ---- 状态色（文本 / 底色成对出现） ---- */
   --lh-success: #007a53;
+  --lh-success-soft: #eaf8f1;
   --lh-warning: #935400;
+  --lh-warning-soft: #fff6e5;
+  /* 收藏态：比 warning 更淡的一层，只给收藏按钮用（warning 本身偏琥珀，铺在按钮上会显重） */
+  --lh-favorite-soft: #fffdf2;
+  --lh-favorite-text: #a16207;
+  --lh-favorite-border: #ecd9a4;
   --lh-danger: #b42332;
+  --lh-danger-soft: #fff0f2;
+  --lh-neutral-soft: #f1f5fb;
+
+  /* ---- 装饰色：仅用于 Hero、专题卡与封面，不承担信息语义 ---- */
+  --lh-hero-surface: #f8fbff;
+  --lh-hero-tint: #e6f5ff;
+  --lh-hero-tint-strong: #daeaff;
+  --lh-hero-glow: #badbff;
+  --lh-hero-border: #e3efff;
+  --lh-cover-from: #061b54;
+  --lh-cover-via: #0b4cbd;
+  --lh-cover-to: #237af3;
+  --lh-cover-glow: #5f9bff;
+  --lh-cover-chip: rgb(255 255 255 / 17%);
+  --lh-book: #4b92ff;
+  --lh-book-spine: #0036bd;
+  --lh-accent-blue: #2672ec;
+  --lh-accent-blue-soft: #86baff;
+  --lh-accent-violet: #6659db;
+  --lh-accent-violet-soft: #b6a6ff;
+  --lh-accent-green: #14a47e;
+  --lh-accent-green-soft: #8ce3b0;
+
+  /* ---- 布局尺寸（docs/ui-design-spec.md 4.1 / 9.1） ---- */
+  --lh-header-height: 64px;
+  --lh-sidebar-width: 240px;
+  --lh-sidebar-collapsed-width: 72px;
+  --lh-content-max: 1760px;
+  --lh-student-max: 1440px;
+
+  /* ---- 映射到 Nuxt UI 语义令牌 ---- */
   --ui-primary: var(--lh-primary);
+  --ui-secondary: var(--lh-accent-violet);
+  --ui-info: var(--lh-primary);
+  --ui-success: var(--lh-success);
+  --ui-warning: var(--lh-warning);
+  --ui-error: var(--lh-danger);
+
+  --ui-text: var(--lh-text);
+  --ui-text-highlighted: var(--lh-text);
+  --ui-text-toned: var(--lh-text-secondary);
+  --ui-text-muted: var(--lh-text-secondary);
+  --ui-text-dimmed: var(--lh-text-dimmed);
+  --ui-text-inverted: #ffffff;
+
+  --ui-bg: var(--lh-surface);
+  --ui-bg-muted: var(--lh-surface-subtle);
+  --ui-bg-elevated: var(--lh-surface-subtle);
+  --ui-bg-accented: #e6ecf5;
+  --ui-bg-inverted: var(--lh-text);
+
+  --ui-border: var(--lh-border);
+  --ui-border-muted: var(--lh-border);
+  --ui-border-accented: var(--lh-control-border);
+  --ui-border-inverted: var(--lh-text);
 }
 
 * { box-sizing: border-box; }
@@ -34,10 +115,17 @@ body {
   color: var(--lh-text);
   font-family: var(--font-sans);
 }
-button, input { font: inherit; }
-button { cursor: pointer; }
-a { color: inherit; }
 :focus-visible { outline: 2px solid var(--lh-primary); outline-offset: 2px; }
+
+/*
+ * Edge / IE 会给 type=password 的原生输入框自动加一个「显示密码」眼睛按钮。
+ * 登录和注册页已经有自己的切换按钮，不隐藏就会出现两个并排的眼睛。
+ * 这两个伪元素只在 Edge/IE 生效，其他浏览器忽略。
+ */
+input[type='password']::-ms-reveal,
+input[type='password']::-ms-clear {
+  display: none;
+}
 
 .sr-only {
   position: absolute;
@@ -61,6 +149,51 @@ a { color: inherit; }
   background: white;
 }
 .skip-link:focus { top: 8px; }
+
+/*
+ * 基础重置说明：`@import "tailwindcss"` 已经带入 Preflight（margin 归零、盒模型、
+ * 图片 max-width、按钮/输入框默认外观等），这里不再叠加第二套 reset，只补几条
+ * Preflight 不管、但项目依赖的。
+ *
+ * 注意：这些规则必须留在 @layer base 里。写成不带 layer 的普通规则会赢过
+ * Tailwind 的 @layer utilities，把组件自带的 text-* 颜色类顶掉——
+ * 典型症状就是 UButton 用 to 渲染成 <a> 后，白字被重置成继承色（变黑）。
+ */
+@layer base {
+  #app { min-height: 100svh; }
+  table { border-collapse: collapse; }
+  img,
+  svg { vertical-align: middle; }
+  a { color: inherit; }
+  button { cursor: pointer; }
+  /* 原生控件继承字体；放在 base 层，组件的 text-* 工具类才能覆盖它 */
+  button,
+  input,
+  textarea,
+  select { font: inherit; }
+}
+
+/*
+ * 页面顶部的筛选行：输入框、下拉统一 13px（比组件默认 14px 小 1px）。
+ *
+ * 注意这里刻意不包含 button 和 a：按钮的字号必须跟 size 走，
+ * 而 UButton 带 to 时渲染成 <a>、不带 to 时是 <button>，
+ * 一旦只对 button 生效，同一行里两种按钮就会差 1px。
+ */
+.page-toolbar :is(input, textarea, select) {
+  font-size: 13px;
+}
+
+/*
+ * 数据表格：除第一列（主内容列：资源/课程/用户/分类名）外，表头和内容都居中。
+ * 第一列保留左对齐——那里是两行文本（标题 + 描述），居中会显得凌乱。
+ * 给 UTable 的 ui.base 加 table-center 即可；这条规则不带 layer，
+ * 所以能盖掉单元格上可能残留的 text-start / text-right 工具类。
+ */
+.table-center th:not(:first-child),
+.table-center td:not(:first-child) {
+  text-align: center;
+}
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }

@@ -36,45 +36,97 @@ build 先运行 Vite，生成 Nuxt UI 的组件声明，再运行应用及 Vite 
 
 Nuxt UI 按[官方独立 Vue 集成指南](https://ui.nuxt.com/docs/getting-started/installation/vue)配置：Vite 插件、Vue 插件、CSS 导入、`UApp` 和根容器 `isolate`。直接依赖固定版本，完整依赖树由 `package-lock.json` 锁定。
 
-## 页面架构（布局阶段）
+## 页面架构
 
-- `src/assets/main.css`：设计令牌、基础元素和通用无障碍规则；不放某一页的卡片布局。
-- `src/layouts/StudentLayout.vue`：学生端顶栏、内容宽度和页脚。
-- `src/layouts/DashboardLayout.vue`：教师和管理员共用的侧栏、工具栏及移动抽屉；`TeacherLayout.vue` 与 `AdminLayout.vue` 提供角色导航配置。
-- `src/components/common/`：`BaseCard` 提供卡片表面与插槽，`EmptyState` 和 `StatCard` 提供状态展示，`ServiceHealthPanel` 单独负责真实健康检查。
-- `Breadcrumbs` 接收页面层级数组；首页不显示，后台布局默认显示“首页 / 当前页”，学生端后续页面可通过布局插槽传入。
-- `src/pages/`：只组合布局和内容组件；页面特有的 Hero 与 Bento 样式留在页面内。
+- `src/assets/main.css`：唯一的主题层。`--lh-*` 是 Learn-Hub 自有令牌（品牌色、状态色、布局尺寸、装饰色），并映射到 Nuxt UI 的 `--ui-*` 语义令牌；圆角比例尺按 UI 规范重定为 8 / 12 / 20 / 24，页面不再写死色值。
+- `src/layouts/StudentLayout.vue`：学生端顶栏、1440 内容宽与页脚。
+- `src/layouts/DashboardLayout.vue`：教师 / 管理员共用的 `USidebar` 壳（240 展开 / 72 图标折叠、1024 断点、移动端 Slideover、折叠偏好持久化）。后台是“平铺”结构：**页面标题就是顶栏里的 `h1`**（16px），内容区直接从数据开始，不再重复标题与说明；`TeacherLayout.vue` 与 `AdminLayout.vue` 只提供角色与标题配置。
+- `src/components/common/`：`BaseCard`（UCard）、`EmptyState`（UEmpty）、`StatCard`（UCard）、`ServiceHealthPanel`（UCard + UBadge + 真实健康检查）、`AppBrand`（CSS 品牌标记）、`PageHeader`、`ErrorState`、`AsyncRegion`。
+- `src/components/resources/`：`ResourceCard`（资源卡，含 loading 骨架）、`ResourceFilterPanel`（课程/分类/类型筛选）、`ResourceToolbar`（总数与排序）、`StatusBadge`（资源状态）、`ResourceTypeBadge`（document / video / link）。
+- `src/components/illustrations/`：`HeroIllustration`（首屏装饰插画，纯 SVG 几何、颜色走主题令牌、无外部素材与授权问题）。换成位图插画时放在 `src/assets/illustrations/`，用 `<img>` 引入并固定宽高。
+- `src/types/`：`resource.ts` 放与 API 契约一致的前端枚举和展示模型，不用数据库模型代替。
+- `src/pages/`：只组合布局和内容组件；首页特有的 Hero 与 Bento 样式留在页面内。
+- 后台（教师 / 管理员）**不使用面包屑**：侧栏当前项已经表达位置，再加一行会与页面标题重复。学生端在有三级页面（如资源详情）时再用 `UBreadcrumb`；学生首页与资源中心目前只有两级，顶部导航足够。
 
-`/` 为学生首页，`/teacher`、`/admin` 为工作台**布局预览**。后两页没有业务权限和数据接入，正式接入时需增加认证与路由守卫，并以服务端授权为准。规划中的侧栏项目只显示文字，不提供无效链接。
+`/` 为学生首页，`/resources` 为学生资源目录，`/teacher`、`/admin` 为工作台**布局预览**。后两页没有业务权限和数据接入，正式接入时需增加认证与路由守卫，并以服务端授权为准。规划中的侧栏项目只显示文字与“规划中”徽章，不提供无效链接。
 
-## 当前验证状态
+### 资源中心（已接入目录接口）
 
-任务四验证：`npm run build` 与 Vue/TypeScript 类型检查通过；真实启动 Vite 与后端后，Vite 代理的 `/health` 返回 200。浏览器内的首页状态切换尚未单独验证。
+已接入 GET /resources 的标题搜索、课程/分类/类型筛选、最新/标题排序、20/40 条分页。筛选与页码保存在 URL，非法参数规整为默认值；新请求使旧响应失效，会话退出时清空结果。未登录显示登录引导，登录后返回原目录条件。
 
-2026-10-24，任务二第 2 步已执行：
+课程与分类使用启用字典，每次加载 100 条，可继续加载下一页；字典请求失败单独显示重试，不阻塞标题搜索。桌面采用左侧筛选栏，移动端采用带草稿的 Nuxt UI 抽屉；关闭放弃修改，应用后才更新结果。
 
-- `npm install --strict-peer-deps` 成功，安装 363 个依赖包，未报告 engine 或 peer dependency 冲突。
-- `npm ls --depth=0` 成功，9 项直接依赖均与固定版本一致；`package-lock.json` 与 `package.json` 对照检查通过。
-- JSON 配置解析、必要文件和 UTF-8 文本检查通过。
+卡片和列表复用 ResourceCard，点击打开 Nuxt UI 资源信息弹窗，通过 GET /resources/{id} 加载最新详情，支持加载提示、失败重试和资源不存在提示。关闭弹窗或切换会话后忽略旧请求结果。外链只允许 HTTPS，明确显示域名并在新窗口打开；详情弹窗提供收藏操作，未设置独立页面。
 
-依赖审计仍报告 1 项低危漏洞：[esbuild GHSA-g7r4-m6w7-qqqr](https://github.com/advisories/GHSA-g7r4-m6w7-qqqr)。当前链路为 `@nuxt/ui → @nuxt/fonts → fontless → esbuild@0.27.7`；上游 fontless 使用 `^0.27.0` 约束。已执行不带 `--force` 的 `npm audit fix --strict-peer-deps`，未能消除该报告。后续需评估上游更新或经兼容性验证的修复方案。
+2026-11-10：生产构建及类型检查通过；目录 URL 的筛选往返、非法参数、长度与分页边界检查通过。真实登录数据和浏览器视觉验收由用户执行。
+### 通知
 
-2026-10-24，任务二第 3 步实际验证结果：
+学生、教师和管理员登录后均可从顶部铃铛打开通知面板。GET /users/me/notifications 支持全部/未读筛选和每页 10 条分页，PATCH /users/me/notifications/{id}/read 逐条标记已读；只在接口成功后更新状态。未读数取未读查询的 total，进入页面、打开面板、窗口重新获得焦点及可见页面每 60 秒更新。支持手动刷新、空态、失败重试，会话变化或组件卸载时忽略旧请求并清理定时器。接口暂不提供全部已读和资源跳转目标，因此不展示对应操作。
+
+### 视觉方向
+
+后续样式统一遵循 [Learn-Hub 视觉方向](../docs/visual-direction.md)：极简几何、蓝白品牌色，主色 #155EEF。PageHeader 必须传入英文 eyebrow，资源卡片使用克制的几何点缀，避免大面积渐变与发光效果。
+
+### 公共组件约定
+
+| 组件 | 状态口径 | 约束 |
+| --- | --- | --- |
+| `PageHeader` | 静态 props | 学生端页面用它（标题 + 说明 + 右侧动作）；后台不用，标题在顶栏里 |
+| `AsyncRegion` | `status: loading / ready / empty / error / unavailable` | 单一判别字段，不允许 `loading + empty` 这类矛盾组合；`error` 时必须给 `retry` 事件 |
+| `ErrorState` | 静态 props + `retry` 事件 | 只展示安全信息；`request_id` 原样显示便于报障 |
+| `EmptyState` | 静态 props | `unavailable`（未接入）与 `empty`（真的没有）文案必须分开 |
+| `StatusBadge` | `ResourceStatus` + `context` | 文字 + 图标，不只靠颜色；`approved` 在审核语境下读作“已通过” |
+| `ResourceTypeBadge` | `ResourceType` | 只区分文档 / 视频 / 链接，不按文件格式细分 |
+| `ResourceCard` | `ResourceSummary` + `loading` | 缺封面用类型渐变与图标占位；通过 open 事件交给页面展示资源信息，不在卡片内请求数据 |
+| `ResourceFilterPanel` | `ResourceFilters` | 每维单选，`null` = 全部；字典分页加载，失败时可单独重试 |
+| `ResourceToolbar` | `total` + `sort` | 总数只认服务端 `total`，缺失时显示 “—”，不写死 0 |
+
+这些公共组件由当前业务页面按需要调用，实际使用情况以 `src/pages/` 和构建结果为准。
+
+### Nuxt UI 接入台账
+
+| 场景 | 组件 | 说明 |
+| --- | --- | --- |
+| 根容器 | `UApp` | `main.ts` 安装 Vue 插件 |
+| 后台壳 | `USidebar` | 图标折叠、移动抽屉与抽屉焦点管理由库提供 |
+| 卡片表面 | `UCard` | 边框、底色、圆角、分隔线来自主题 |
+| 空 / 未接入状态 | `UEmpty` | `variant="naked"`，放在卡片内部 |
+| 标签与状态 | `UBadge` | “规划中”“待接入”、健康检查状态 |
+| 动作 | `UButton` | 含图标按钮与 `to` 路由链接 |
+| 图标 | `UIcon` + `@iconify-json/lucide` | 构建期打包，不请求 iconify CDN |
+| 面包屑 | `UBreadcrumb` | 当前未使用；留给学生端三级页面，后台不用 |
+
+### 主题与图标配置
+
+`vite.config.ts` 中 `ui()` 有两处非默认配置：
+
+- `colorMode: false`：首版只有浅色设计，避免系统深色时页面自动变黑。
+- `icon: { clientBundle: { scan: true } }`：把模板里出现的 `i-lucide-*` 打包进产物。
+
+`@iconify-json/lucide` 是 devDependency，只在构建期读取图标数据。新增图标时先在模板写 `i-lucide-<name>`，名字必须存在于该图标集，否则构建会报错并列出未解析的图标。
+
+注意：图标扫描在开发服务器启动时做一次，之后只增量扫描被修改的文件。**新建组件文件里的图标可能要重启开发服务器才会进包**；`npm run build` 不受影响。如果新图标显示成空白，先重启再判断是否为拼写问题。
+
+## 当前检查与历史验证记录
+
+2026-11-11：`npm run build` 与随后的 TypeScript 检查通过；用户已完成页面基本检查。以下表格记录的是较早的组件整理阶段，不代表当前构建状态。
+
+2026-11-05，前端结构与组件层整理：
 
 | 检查项 | 实际结果 |
 | --- | --- |
-| `npm run build` | 退出码 0；Vite 8.3.5 完成生产构建，753 个模块转换并生成 dist |
-| build 内的 `vue-tsc` 和 `tsc` | 均通过；分别检查 Vue 应用和 Vite 配置 |
-| `npm run preview` | 成功在本机回环地址 4173 启动；浏览器正常显示首页 |
-| Nuxt UI 样式 | 1280 × 720 桌面视口中，卡片、徽章和按钮显示正常；没有横向溢出 |
-| 组件交互 | 生产页面鼠标点击两次、键盘 Enter 一次，计数显示“已响应 3 次点击” |
-| 首页链接 | 点击 Learn-Hub 链接仍在首页，组件计数保留 |
-| 生产页面控制台 | 本次操作范围内未捕获 warn/error |
-| 默认开发端口 | 5173 已被占用，启动按 strictPort 配置报错；未停止占用进程 |
-| `npm run dev -- --port 5174` | 临时端口启动成功；浏览器点击按钮后显示“已响应 1 次点击” |
-| 开发页面控制台 | 本次仅观察到 Vite connecting/connected 调试输出，未捕获 warn/error |
-| `npm audit --json` 复核 | 仍有上述 1 项 esbuild 低危报告，审计命令退出码 1 |
+| `npm run type-check` | 通过，`vue-tsc` 与 `tsc` 退出码 0（含新增组件与 `src/types`） |
+| 运行中的 Vite 开发服务器 | 改动的 24 个页面/组件/样式/类型模块全部返回 200；`/resources` 入口返回 200 |
+| 新增组件 | `PageHeader`、`ErrorState`、`AsyncRegion`、`StatusBadge`、`ResourceTypeBadge`、`ResourceCard`、`ResourceFilterPanel`、`ResourceToolbar` 均通过编译与类型检查 |
+| `virtual:nuxt-ui-icons` | 已包含实际使用的图标，也包含库默认的 `chevron-right`、`close`，确认离线可用 |
+| `virtual:nuxt-ui-plugins` | 不再包含 color-mode 插件，确认浅色主题不会被系统深色覆盖 |
+| 样式产物 | 编译后的 CSS 同时包含 `--lh-*`、`--ui-*` 映射与重定后的 `--radius-*` |
+| `npm run build` | 未执行（受限环境无法运行 Vite 构建） |
+| 浏览器视觉验收 | 未执行（1440 / 1024 / 390 三个宽度待人工检查） |
 
-浏览器首次无法连接沙箱内的预览服务；改为在本机 `127.0.0.1` 启动后完成验证，未修改监听配置或防火墙。截图保存到本地 `.verification/`，该目录已忽略提交。
+历次记录：
 
-上述结果只覆盖当前最小首页的桌面样式和交互，不代表已验证业务页面、后端联调、移动端或全部浏览器兼容性。
+- 2026-10-24：依赖安装与锁文件、`npm run build`、`npm run preview`、桌面视口渲染与控制台检查通过，覆盖的是当时的最小首页；首页此后已重写，该记录的界面部分不再代表当前实现。
+- 依赖审计仍报告 1 项低危漏洞：[esbuild GHSA-g7r4-m6w7-qqqr](https://github.com/advisories/GHSA-g7r4-m6w7-qqqr)，链路为 `@nuxt/ui → @nuxt/fonts → fontless → esbuild`，上游未修复，`npm audit fix` 无效。
+
+以上是当时的验证记录；当前代码以重新运行构建及用户的页面检查为准。

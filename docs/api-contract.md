@@ -36,9 +36,9 @@
 | --- | --- |
 | User | id, username, display_name, role, is_active, created_at, updated_at |
 | Token | access_token, token_type（固定 bearer）, expires_in（秒）, user: User |
-| Course | id, code, title, description, teacher_id, is_active, created_at, updated_at |
+| Course | id, code, title, description, teacher_id, teacher_display_name, is_active, created_at, updated_at |
 | Category | id, name, description, is_active, created_at, updated_at |
-| Resource | id, title, description, resource_type, url, duration_seconds, page_count, course_id, category_id, owner_id, status, version_id, created_at, updated_at |
+| Resource | id, title, description, resource_type, url, duration_seconds, page_count, course_id, course_title, course_teacher_id, course_teacher_display_name, category_id, category_name, owner_id, owner_display_name, is_favorited, status, version_id, created_at, updated_at |
 | ReviewRecord | id, resource_id, reviewer_id, resource_version, decision, comment, created_at |
 | LearningRecord | id, user_id, resource_id, progress, last_accessed_at, created_at, updated_at |
 | Favorite | id, resource_id, created_at |
@@ -85,7 +85,8 @@
 | 方法与路径 | 输入 | 权限 | 成功响应 data |
 | --- | --- | --- | --- |
 | GET /courses | 分页；q?（标题，1–100 字符）、is_active? | 登录；非管理员只能查启用课程 | 200 分页 Course，created_at/id 倒序 |
-| GET /courses/{id} | 路径 id | 登录；非管理员仅启用课程 | 200 Course |
+| GET /courses/mine | 分页；q?（标题，1–100 字符）、is_active? | 教师；仅本人负责的课程，包含停用课程 | 200 分页 Course，created_at/id 倒序 |
+| GET /courses/{id} | 路径 id | 登录；启用课程、本人负责的停用课程或管理员 | 200 Course |
 | POST /courses | JSON: code, title, description?, teacher_id? | 教师/管理员 | 201 Course |
 | PATCH /courses/{id} | JSON: code?、title?、description?、is_active?、teacher_id? | 负责人/管理员 | 200 Course |
 | GET /categories | 分页；is_active? | 登录；非管理员只能查启用分类 | 200 分页 Category，name/id 升序 |
@@ -93,6 +94,8 @@
 | PATCH /categories/{id} | JSON: name?、description?、is_active? | 管理员 | 200 Category |
 
 code 1–32 字符，仅 ASCII 字母、数字、短横线，规范化为大写；title 1–200，description 最多 5000。教师创建时 teacher_id 由后端固定为本人，不接受该字段；管理员创建时 teacher_id 必填，修改时也只有管理员可以转移负责人，目标必须为启用教师。课程代码冲突 409 `COURSE_CODE_EXISTS`。
+
+`teacher_display_name` 来自当前负责人用户记录，供有权查看课程的用户显示姓名；不依赖管理员专用的用户列表。`/courses/mine` 由后端使用当前登录教师 ID 筛选，不接收客户端传入的 teacher_id；默认包含本人停用课程，显式传入 is_active 可继续筛选。转移负责人后，该课程立即从原教师的 mine 列表移出。
 
 分类 name 1–64，description 最多 1000；名称去首尾空格后唯一，冲突 409 `CATEGORY_NAME_EXISTS`。非管理员显式查询 is_active=false 返回 403，不扩大可见范围。
 
@@ -102,6 +105,7 @@ code 1–32 字符，仅 ASCII 字母、数字、短横线，规范化为大写�
 | --- | --- | --- | --- |
 | GET /resources | 分页；q?、course_id?、category_id?、resource_type?、sort? | 登录；仅常规可见资源 | 200 分页 Resource |
 | GET /resources/mine | 分页；status? | 登录；仅本人资源，包含历史角色拥有资源 | 200 分页 Resource |
+| GET /resources/admin | 分页；q?、status?、course_id?、category_id?、resource_type?、sort? | 管理员；全部状态，包含停用课程或分类中的资源 | 200 分页 Resource |
 | GET /resources/{id} | 路径 id | 常规可见、本人的资源、授权待审资源或管理员 | 200 Resource |
 | POST /resources | JSON 见下 | 学生/教师 | 201 Resource，status=draft |
 | PATCH /resources/{id} | JSON: expected_version + 可编辑字段 | 学生/教师且本人；draft/rejected | 200 Resource |
@@ -124,6 +128,12 @@ code 1–32 字符，仅 ASCII 字母、数字、短横线，规范化为大写�
 ```
 
 创建必填 title、resource_type、url、course_id、category_id；description 默认空字符串；duration_seconds 与 page_count 默认 null。owner_id、status、version_id 由后端生成，不允许传入。
+
+学生和教师可以向任意启用课程投稿，包括其他教师负责的课程；后端校验课程与分类存在且启用。投稿先保存为 draft，提交后进入 pending，不能因选择了课程就直接公开。该课程的负责人或管理员可审核，但资源所有者不得自审。
+
+Resource 响应包含归属课程的 `course_title` 和分类的 `category_name`；已授权查看本人资源时，即使课程或分类后来停用也返回名称，不依赖 `/courses/mine` 字典。
+Resource 还包含当前课程负责人的 `course_teacher_id`、`course_teacher_display_name`，以及投稿者的 `owner_display_name`；教师转移或用户改名后，后续响应反映当前姓名。
+`is_favorited` 根据当前登录用户的收藏记录计算，不存储在资源表；资源不可公开时，历史收藏仍可能使其为 true，但不能新增收藏。
 
 可编辑字段仅 title、description、resource_type、url、duration_seconds、page_count、course_id、category_id。编辑必须将已有数据与 PATCH 合并后再检查跨字段约束，切换类型时客户端应显式清空不兼容的元数据字段。规则与长度见 requirements.md。
 
@@ -156,6 +166,10 @@ decision 仅 approved / rejected；comment 最多 2000 字符，拒绝时去空�
 | PATCH /users/me/notifications/{id}/read | 无 body | 仅通知接收人 | 200 Notification，重复标记保留首次 read_at |
 
 上述路径不接受 user_id；后端从当前身份取得。收藏记录不可见不影响取消收藏；学习进度更新采用最后成功写入值，不提供多端版本合并。并发首次写入由唯一约束和安全 upsert/回读保证不重复，不捕获后忽略所有 IntegrityError。
+
+收藏列表每项返回收藏的 id、resource_id、created_at 和 resource。仅当资源仍满足公开可见条件时 resource 为 Resource；资源撤回、归档或关联课程/分类停用时 resource 为 null，仍保留 resource_id 供用户取消收藏，不暴露非公开标题或链接。
+
+学习记录列表每项**始终**返回 resource（id、title、resource_type、course_title、category_name、status）；资源不再满足公开可见条件时 `is_available` 为 false 且 `url` 为 null。这与收藏刻意不同：收藏是“还想再看”的清单，资源失效即失去意义；学习记录是“学过什么”的历史，需要保留识别信息，但同样不提供内容入口。
 
 ## 9. 操作日志（后续切片）
 

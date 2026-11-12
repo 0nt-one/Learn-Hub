@@ -6,7 +6,15 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_')
 
   return {
-    plugins: [vue(), ui()],
+    plugins: [
+      vue(),
+      ui({
+        // 首版只有浅色设计，关闭系统暗色自动切换，避免页面在深色系统下变黑。
+        colorMode: false,
+        // 扫描模板中用到的 i-lucide-* 图标并打包进产物，避免运行时请求 iconify CDN。
+        icon: { clientBundle: { scan: true } },
+      }),
+    ],
     server: {
       host: '127.0.0.1',
       port: 5173,

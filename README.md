@@ -2,7 +2,7 @@
 
 在线学习资源管理与共享平台，面向学生、教师和管理员。
 
-任务一至任务四的设计、工程初始化、九张数据库表模型与最小联调已完成。当前首页会调用后端健康检查；业务接口、身份认证和权限规则仍按设计文档在后续阶段实现。
+设计文档、前后端工程、九张数据库表，以及注册登录、三角色权限、资源投稿与审核、收藏、学习记录、通知和管理员操作日志均已实现。首页会调用后端健康检查。
 
 ## 项目结构
 
@@ -57,10 +57,16 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m pip check
 ```
 
-首次启动先在 backend 目录初始化数据库：
+首次启动先复制 `backend/.env.example` 为 `backend/.env`，为 `JWT_SECRET_KEY` 设置至少 32 字节的本地随机值，再在 backend 目录初始化数据库：
 
 ```powershell
 .\.venv\Scripts\python.exe -m app.db.init_db
+```
+
+首次使用还需创建管理员账号；在 backend 目录的交互终端运行，密码不会显示在屏幕上：
+
+```powershell
+.\.venv\Scripts\python.exe -m app.cli.bootstrap_admin
 ```
 
 日常从项目根目录启动：
@@ -70,9 +76,9 @@ cd C:\Users\liyi\Learn-Hub
 .\backend\.venv\Scripts\python.exe -m uvicorn app.main:create_app --factory --app-dir backend --host 127.0.0.1 --port 8000 --reload --reload-dir backend/app
 ```
 
-API 文档：<http://127.0.0.1:8000/docs>；健康检查：<http://127.0.0.1:8000/health>。数据库未初始化时健康检查返回 503，九张表已就绪时返回 200。业务路由尚未实现。
+API 文档：<http://127.0.0.1:8000/docs>；健康检查：<http://127.0.0.1:8000/health>。数据库未初始化时健康检查返回 503，九张表已就绪时返回 200。若后端使用 8010 等其他端口，需在 `frontend/.env.local` 中设置相同的 `VITE_API_PROXY_TARGET`，例如 `http://127.0.0.1:8010`。
 
-默认配置可以直接使用。需要覆盖时，前端复制 `frontend/.env.example` 为 `.env.local`，后端复制 `backend/.env.example` 为 `.env`。前端 `VITE_` 变量可被浏览器读取，不存放密钥；后端 `.env` 不提交。
+前端默认代理到 8000 端口；需要覆盖时复制 `frontend/.env.example` 为 `.env.local`。前端 `VITE_` 变量可被浏览器读取，不存放密钥；后端密钥保存在不提交的 `.env`。
 
 前端已配置 `/api` 和 `/health` 开发代理至 `http://127.0.0.1:8000`，后端默认关闭跨域。先启动后端，再打开首页即可查看实际连接状态。
 
@@ -92,7 +98,9 @@ npm run build
 .\.venv\Scripts\python.exe -m pytest -q
 ```
 
-## 验收结果与问题
+## 当前检查与历史记录
+
+2026-11-11：后端现有 35 项测试通过；前端 `npm run build`（含类型检查）通过。用户已完成页面基本检查。以下记录来自工程初始化阶段，只说明当时的状态，不代表当前完整业务页面的验收结果。
 
 任务四验证：前端 `npm run build` 与类型检查通过；后端 `17 passed in 0.77s`；独立端口下真实 HTTP 请求至后端 `/health` 和 Vite 代理 `/health` 均返回 200。测试服务已停止，临时联调数据库已删除。浏览器中的首页状态变化尚未单独验证。
 
@@ -112,6 +120,3 @@ npm run build
 
 后端测试首次遇到临时目录准备错误，沙箱内后续执行未返回；最终在本机完整重跑并通过，详情见 [后端记录](backend/README.md)。浏览器验证只覆盖当前桌面首页，尚不代表移动端、业务页面、权限或数据库功能的验证。
 
-## 下一阶段
-
-按功能切片实现身份认证、后端权限校验和资源业务流程，并让设计模式进入真实调用链。
